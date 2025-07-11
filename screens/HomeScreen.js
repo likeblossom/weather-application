@@ -1,0 +1,140 @@
+import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MagnifyingGlassIcon } from 'react-native-heroicons/outline';
+import { theme } from '../theme';
+import { MapPinIcon } from 'react-native-heroicons/solid';
+
+export default function HomeScreen() {
+
+  const [showSearch, toggleSearch] = React.useState(false);
+  const [locations, setLocations] = React.useState([1,2,3]);
+
+  const handleLocation = (location) => {
+    console.log("Selected location:", location);
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <Image 
+        source={require('../assets/images/bg.png')} 
+        blurRadius={70}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
+
+      <SafeAreaView style={styles.safeArea}>
+        {/* Search bar */}
+        <View style={styles.searchContainer}>
+          <View style={[
+            styles.searchBar,
+            {backgroundColor: showSearch ? theme.bgWhite(0.2) : 'transparent'}
+          ]}>
+            {showSearch ? (
+              <TextInput
+                placeholder="Search city"
+                placeholderTextColor={'lightgrey'}
+                style={styles.textInput}
+              />
+            ) : null}
+
+            <TouchableOpacity
+              onPress={() => toggleSearch(!showSearch)}
+              style={[styles.searchButton, {backgroundColor: theme.bgWhite(0.3)}]}
+            >
+              <MagnifyingGlassIcon size="25" color="white" />
+            </TouchableOpacity>
+          </View>
+          {
+            locations.length > 0 && showSearch ? (
+                <View style={styles.searchResults}>
+                    {
+                        locations.map((loc, index) => {
+                            let showBorder = index + 1 !== locations.length;
+                            return (
+                                <TouchableOpacity 
+                                    onPress={() => handleLocation(loc)}
+                                    key={index} 
+                                    style={[
+                                      styles.locationItem,
+                                      showBorder && styles.locationItemBorder
+                                    ]}
+                                >
+                                    <MapPinIcon size="20" color="gray" />
+                                    <Text className="text-black text-lg ml-2"> Montreal, Canada</Text>
+                                </TouchableOpacity>
+                            );
+                        })
+                    }
+                </View>
+            ) : null
+          }
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  searchContainer: {
+    height: '7%',
+    marginHorizontal: 16,
+    position: 'relative',
+    zIndex: 50,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    borderRadius: 25,
+  },
+  textInput: {
+    paddingLeft: 24,
+    height: 40,
+    paddingBottom: 4,
+    flex: 1,
+    fontSize: 16,
+    color: 'white',
+  },
+  searchButton: {
+    borderRadius: 25,
+    padding: 12,
+    margin: 4,
+  },
+  searchResults: {
+    position: 'absolute',
+    width: '100%',
+    backgroundColor: '#d1d5db', // bg-gray-300
+    top: 64, // top-16 (16 * 4 = 64px)
+    borderRadius: 24, // rounded-3xl
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
+  locationItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#9ca3af', // border-b-gray-400
+  },
+  locationText: {
+    color: 'black',
+    marginLeft: 8,
+  },
+});
