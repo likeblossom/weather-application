@@ -1,19 +1,46 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/outline';
 import { theme } from '../theme';
 import { MapPinIcon } from 'react-native-heroicons/solid';
+import {debounce} from 'lodash';
+import { fetchLocations, fetchWeatherForecast } from '../api/weather';
 
 export default function HomeScreen() {
 
   const [showSearch, toggleSearch] = React.useState(false);
-  const [locations, setLocations] = React.useState([1,2,3]);
+  const [locations, setLocations] = React.useState([]);
 
   const handleLocation = (location) => {
-    console.log("Selected location:", location);
+    console.log('Selected location:', location);
+    setLocations([]); // Clear locations after selection
+    toggleSearch(false); // Hide search dropdown
+    
+    // Use the latitude and longitude from the selected location
+    fetchWeatherForecast({
+      latitude: location.latitude,
+      longitude: location.longitude
+    }).then(data => {
+      console.log('Got forecast:', data);
+      // Here you can update your weather state with the returned data
+    });
   }
+
+  const handleSearch = value => {
+    // Fetch locations
+    if(value.length > 2){
+      fetchLocations({ cityName: value }).then(data=> {
+        console.log('got locations: ', data);
+        if(data && data.results) {
+          setLocations(data.results);
+        }
+      })
+    }
+  }
+
+  const handleTextDebounce = useCallback(debounce(handleSearch, 1200), []);
 
   return (
     <View style={styles.container}>
@@ -34,6 +61,7 @@ export default function HomeScreen() {
           ]}>
             {showSearch ? (
               <TextInput
+                onChangeText={handleTextDebounce}
                 placeholder="Search city"
                 placeholderTextColor={'lightgrey'}
                 style={styles.textInput}
@@ -63,7 +91,7 @@ export default function HomeScreen() {
                                     ]}
                                 >
                                     <MapPinIcon size="20" color="gray" />
-                                    <Text style={styles.locationText}> Montreal, Canada</Text>
+                                    <Text style={styles.locationText}>{loc?.name}, {loc?.country}</Text>
                                 </TouchableOpacity>
                             );
                         })
