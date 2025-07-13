@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/outline';
@@ -8,6 +8,7 @@ import { MapPinIcon } from 'react-native-heroicons/solid';
 import {debounce} from 'lodash';
 import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature } from '../api/weather';
 import { getWeatherImage } from '../constants';
+import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 
 export default function HomeScreen() {
 
@@ -16,7 +17,19 @@ export default function HomeScreen() {
   const [weather, setWeather] = React.useState({});
   const [currentLocation, setCurrentLocation] = React.useState(null);
 
-  const handleLocation = (location) => {
+  // Load last searched city
+  useEffect(() => {
+    loadLastSearchedCity();
+  }, []);
+
+  const loadLastSearchedCity = async () => {
+    const cityData = await loadLastCity();
+    if (cityData) {
+      handleLocation(cityData, false); // false to avoid saving again
+    }
+  };
+
+  const handleLocation = (location, shouldSave = true) => {
     console.log('Selected location:', location);
     console.log('City name:', location.name);
     console.log('Country:', location.country);
@@ -24,6 +37,11 @@ export default function HomeScreen() {
     setLocations([]); // Clear locations after selection
     toggleSearch(false); // Hide search dropdown
     setCurrentLocation(location); // Store the selected location
+    
+    // Save to AsyncStorage if this is a new selection (not loading from storage)
+    if (shouldSave) {
+      saveLastCity(location);
+    }
     
     // Use the latitude and longitude from the selected location
     fetchWeatherForecast({
