@@ -6,25 +6,32 @@ import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/ou
 import { theme } from '../theme';
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition } from '../api/weather';
+import { getWeatherImage } from '../constants';
 
 export default function HomeScreen() {
 
   const [showSearch, toggleSearch] = React.useState(false);
   const [locations, setLocations] = React.useState([]);
+  const [weather, setWeather] = React.useState({});
+  const [currentLocation, setCurrentLocation] = React.useState(null);
 
   const handleLocation = (location) => {
     console.log('Selected location:', location);
+    console.log('City name:', location.name);
+    console.log('Country:', location.country);
+    
     setLocations([]); // Clear locations after selection
     toggleSearch(false); // Hide search dropdown
+    setCurrentLocation(location); // Store the selected location
     
     // Use the latitude and longitude from the selected location
     fetchWeatherForecast({
       latitude: location.latitude,
       longitude: location.longitude
     }).then(data => {
+      setWeather(data);
       console.log('Got forecast:', data);
-      // Here you can update your weather state with the returned data
     });
   }
 
@@ -40,7 +47,8 @@ export default function HomeScreen() {
     }
   }
 
-  const handleTextDebounce = useCallback(debounce(handleSearch, 1200), []);
+  const handleTextDebounce = useCallback(debounce(handleSearch, 900), []);
+  const {current} = weather;
 
   return (
     <View style={styles.container}>
@@ -104,25 +112,31 @@ export default function HomeScreen() {
         <View style={styles.forecastContainer}>
             {/* Location section */}
             <Text style={styles.locationName}>
-              Montreal,  
-            <Text style={styles.countryName}> 
-                 Canada
-                </Text>
+              {currentLocation?.name || "Select a city"}
+              {currentLocation?.name && currentLocation?.country && ", "}
+              <Text style={styles.countryName}> 
+                {currentLocation?.country || ""}
+              </Text>
             </Text>
             {/* Weather image section */}
             <View style={styles.weatherImageContainer}>
               <Image 
-                source={require('../assets/images/partlycloudy.png')} 
+                source={
+                  current?.weathercode 
+                    ? getWeatherImage(getWeatherCondition(current.weathercode).image)
+                    : getWeatherImage('sun')
+                } 
                 style={styles.weatherImage}
               />
             </View>
             {/* Temperature section */}
             <View style={styles.temperatureContainer}>
                 <Text style={styles.temperature}>
-                    25&#176;
+                    {current?.temperature_2m ? `${Math.round(current.temperature_2m)}` : ''}
+                    {current?.temperature_2m && <Text>&#176;C</Text>}
                 </Text>
                 <Text style={styles.weatherDescription}>
-                    Partly Cloudy
+                    {current?.weathercode ? getWeatherCondition(current.weathercode).condition : ''}
                 </Text>
             </View>
             {/* Other statistics/details */}
@@ -266,9 +280,9 @@ const styles = StyleSheet.create({
   searchResults: {
     position: 'absolute',
     width: '100%',
-    backgroundColor: '#d1d5db', // bg-gray-300
-    top: 64, // top-16 (16 * 4 = 64px)
-    borderRadius: 24, // rounded-3xl
+    backgroundColor: '#d1d5db',
+    top: 64,
+    borderRadius: 24,
   },
   locationItem: {
     flexDirection: 'row',
@@ -279,7 +293,7 @@ const styles = StyleSheet.create({
   },
   locationItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#9ca3af', // border-b-gray-400
+    borderBottomColor: '#9ca3af',
   },
   locationText: {
     color: 'black',
@@ -302,15 +316,15 @@ const styles = StyleSheet.create({
   countryName: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#d1d5db', // text-gray-300
+    color: '#d1d5db',
   },
   weatherImageContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
   weatherImage: {
-    width: 208, // w-52 (52 * 4 = 208px)
-    height: 208, // h-52
+    width: 208,
+    height: 208,
   },
   temperatureContainer: {
     alignItems: 'center',
@@ -319,14 +333,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
     color: 'white',
-    fontSize: 60, // text-6xl
+    fontSize: 60,
     marginLeft: 20,
   },
   weatherDescription: {
     textAlign: 'center',
     color: 'white',
-    fontSize: 20, // text-xl
-    letterSpacing: 2, // tracking-widest
+    fontSize: 20,
+    letterSpacing: 2,
     marginTop: 8,
   },
   statsContainer: {
@@ -339,29 +353,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statIcon: {
-    height: 24, // h-6
-    width: 24,  // w-6
-    marginRight: 8, // space-x-2
+    height: 24,
+    width: 24,
+    marginRight: 8,
   },
   statText: {
     color: 'white',
     fontWeight: '600',
-    fontSize: 16, // text-base
+    fontSize: 16,
   },
   // Daily Forecast section styles
   dailyForecastContainer: {
-    marginBottom: 8, // mb-2
+    marginBottom: 8,
   },
   forecastHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20, // mx-5
-    marginBottom: 12, // space-y-3
+    marginHorizontal: 20,
+    marginBottom: 12,
   },
   forecastHeaderText: {
     color: 'white',
-    fontSize: 16, // text-base
-    marginLeft: 8, // space-x-2
+    fontSize: 16,
+    marginLeft: 8,
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -369,23 +383,23 @@ const styles = StyleSheet.create({
   forecastCard: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 96, // w-24 (24 * 4 = 96px)
-    borderRadius: 24, // rounded-3xl
-    paddingVertical: 12, // py-3
-    marginRight: 16, // mr-4
+    width: 96,
+    borderRadius: 24,
+    paddingVertical: 12,
+    marginRight: 16,
   },
   forecastIcon: {
-    height: 44, // h-11 (11 * 4 = 44px)
-    width: 44,  // w-11
-    marginBottom: 4, // space-y-1
+    height: 44, 
+    width: 44,  
+    marginBottom: 4,
   },
   dayText: {
     color: 'white',
-    marginBottom: 4, // space-y-1
+    marginBottom: 4,
   },
   tempText: {
     color: 'white',
-    fontSize: 20, // text-xl
-    fontWeight: '600', // font-semibold
+    fontSize: 20, 
+    fontWeight: '600', 
   },
 });
