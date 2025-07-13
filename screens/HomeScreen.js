@@ -32,6 +32,8 @@ export default function HomeScreen() {
     }).then(data => {
       setWeather(data);
       console.log('Got forecast:', data);
+      console.log('Weather code:', data?.current?.weathercode);
+      console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
     });
   }
 
@@ -136,8 +138,13 @@ export default function HomeScreen() {
                     {current?.temperature_2m && <Text>&#176;C</Text>}
                 </Text>
                 <Text style={styles.weatherDescription}>
-                    {current?.weathercode ? getWeatherCondition(current.weathercode).condition : ''}
+                    {current?.weathercode !== undefined ? getWeatherCondition(current.weathercode).condition : ''}
                 </Text>
+                {current?.apparent_temperature && (
+                  <Text style={styles.feelsLike}>
+                    Feels like {Math.round(current.apparent_temperature)}&#176;C
+                  </Text>
+                )}
             </View>
             {/* Other statistics/details */}
             <View style={styles.statsContainer}>
@@ -339,9 +346,17 @@ const styles = StyleSheet.create({
   weatherDescription: {
     textAlign: 'center',
     color: 'white',
-    fontSize: 20,
+    fontSize: 24,
     letterSpacing: 2,
     marginTop: 8,
+    fontWeight: '600',
+  },
+  feelsLike: {
+    textAlign: 'center',
+    color: '#8f96a4ff',
+    fontSize: 20,
+    marginTop: 20,
+    fontWeight: '500',
   },
   statsContainer: {
     flexDirection: 'row',
