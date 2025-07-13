@@ -6,7 +6,7 @@ import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/ou
 import { theme } from '../theme';
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature } from '../api/weather';
 import { getWeatherImage } from '../constants';
 
 export default function HomeScreen() {
@@ -49,8 +49,8 @@ export default function HomeScreen() {
     }
   }
 
-  const handleTextDebounce = useCallback(debounce(handleSearch, 900), []);
-  const {current} = weather;
+  const handleTextDebounce = useCallback(debounce(handleSearch, 700), []);
+  const {current, daily} = weather;
 
   return (
     <View style={styles.container}>
@@ -154,7 +154,7 @@ export default function HomeScreen() {
                     style={styles.statIcon} 
                     />
                 <Text style={styles.statText}> 
-                    10 km/h
+                    {current?.windspeed_10m ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
                     </Text>
               </View>
                 <View style={styles.statItem}>
@@ -163,7 +163,7 @@ export default function HomeScreen() {
                     style={styles.statIcon} 
                     />
                 <Text style={styles.statText}> 
-                    23%
+                    {current?.relativehumidity_2m ? `${current.relativehumidity_2m}%` : '--'}
                     </Text>
               </View>
                 <View style={styles.statItem}>
@@ -189,55 +189,33 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.scrollViewContent}
                 showsHorizontalScrollIndicator={false}
             >
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Monday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Tuesday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Wednesday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Thursday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Friday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Saturday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Sunday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
+                {daily?.time && daily.time.map((day, index) => {
+                  const weatherCode = daily.weathercode?.[index];
+                  const maxTemp = daily.temperature_2m_max?.[index];
+                  const minTemp = daily.temperature_2m_min?.[index];
+                  
+                  return (
+                    <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
+                        <Image
+                            source={
+                              weatherCode 
+                                ? getWeatherImage(getWeatherCondition(weatherCode).image)
+                                : getWeatherImage('sun')
+                            }
+                            style={styles.forecastIcon} />
+                        <Text style={styles.dayText}>{getDayName(day)}</Text>
+                        <Text style={styles.tempText}>
+                          {maxTemp ? `${formatTemperature(maxTemp)}` : '--'}
+                          {maxTemp && <Text>&#176;C</Text>}
+                        </Text>
+                        {minTemp && (
+                          <Text style={styles.minTempText}>
+                            {formatTemperature(minTemp)}<Text>&#176;C</Text>
+                          </Text>
+                        )}
+                    </View>
+                  );
+                })}
             </ScrollView>
         </View>
 
@@ -317,13 +295,13 @@ const styles = StyleSheet.create({
   locationName: {
     color: 'white',
     textAlign: 'center',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
   },
   countryName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '600',
-    color: '#d1d5db',
+    color: '#c7caceff',
   },
   weatherImageContainer: {
     flexDirection: 'row',
@@ -411,10 +389,17 @@ const styles = StyleSheet.create({
   dayText: {
     color: 'white',
     marginBottom: 4,
+    fontWeight: 'bold',
   },
   tempText: {
     color: 'white',
     fontSize: 20, 
     fontWeight: '600', 
+  },
+  minTempText: {
+    color: '#9ca3af',
+    fontSize: 18,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });
