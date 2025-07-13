@@ -80,18 +80,23 @@ export const formatTime = (timeString) => {
   });
 };
 
-// Helper function to get day name
-export const getDayName = (dateString) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+// Helper function to get day name with timezone awareness
+export const getDayName = (dateString, timezoneOffset = 0) => {
+  // Parse the date string (format: "YYYY-MM-DD")
+  const [year, month, day] = dateString.split('-').map(Number);
+  const apiDate = new Date(year, month - 1, day); // month is 0-indexed
   
-  if (date.toDateString() === today.toDateString()) {
+  // Get current date, adjusting for potential timezone differences
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  
+  
+  if (apiDate.getTime() === today.getTime()) {
     return 'Today';
-  } else if (date.toDateString() === tomorrow.toDateString()) {
+  } else if (apiDate.getTime() === tomorrow.getTime()) {
     return 'Tomorrow';
   } else {
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
+    return apiDate.toLocaleDateString('en-US', { weekday: 'long' });
   }
 };

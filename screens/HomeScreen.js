@@ -32,6 +32,8 @@ export default function HomeScreen() {
     }).then(data => {
       setWeather(data);
       console.log('Got forecast:', data);
+      console.log('Daily data:', data?.daily);
+      console.log('Daily time array:', data?.daily?.time);
       console.log('Weather code:', data?.current?.weathercode);
       console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
     });
@@ -193,6 +195,8 @@ export default function HomeScreen() {
                   const weatherCode = daily.weathercode?.[index];
                   const maxTemp = daily.temperature_2m_max?.[index];
                   const minTemp = daily.temperature_2m_min?.[index];
+                  
+                  console.log(`Day ${index}:`, day, 'Formatted:', getDayName(day));
                   
                   return (
                     <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
