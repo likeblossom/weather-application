@@ -6,7 +6,7 @@ import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon 
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
@@ -51,10 +51,49 @@ export default function HomeScreen() {
       latitude: location.latitude,
       longitude: location.longitude
     }).then(data => {
+      // Process hourly data to show only next 12 hours from current time in city's timezone
+      if (data?.hourly?.time && data?.current?.time) {
+        // Use the current time from the API response (city's timezone)
+        const currentTimeInCity = new Date(data.current.time);
+        const currentHour = currentTimeInCity.getHours();
+        const currentDate = currentTimeInCity.getDate();
+        
+        // Find the index of the current hour in the hourly data
+        let startIndex = 0;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+          const hourlyTime = new Date(data.hourly.time[i]);
+          // Check if this hour matches the current hour and date in the city's timezone
+          if (hourlyTime.getHours() === currentHour && hourlyTime.getDate() === currentDate) {
+            startIndex = i;
+            break;
+          }
+          // If passed the current time, use the next available hour
+          if (hourlyTime >= currentTimeInCity) {
+            startIndex = i;
+            break;
+          }
+        }
+        
+        // Slice the arrays to get next 13 hours
+        const next13Hours = {
+          ...data.hourly,
+          time: data.hourly.time.slice(startIndex, startIndex + 13),
+          temperature_2m: data.hourly.temperature_2m?.slice(startIndex, startIndex + 13),
+          apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 13),
+          weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 13),
+          relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 13),
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13)
+        };
+        
+        data.hourly = next13Hours;
+      }
+      
       setWeather(data);
       console.log('Got forecast:', data);
       console.log('Daily data:', data?.daily);
+      console.log('Hourly data:', data?.hourly);
       console.log('Daily time array:', data?.daily?.time);
+      console.log('Hourly time array:', data?.hourly?.time);
       console.log('Weather code:', data?.current?.weathercode);
       console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
     });
@@ -146,7 +185,7 @@ export default function HomeScreen() {
   }
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 700), []);
-  const {current, daily} = weather;
+  const {current, daily, hourly} = weather;
 
   return (
     <View style={styles.container}>
@@ -225,169 +264,218 @@ export default function HomeScreen() {
             ) : null
           }
         </View>
-        {/* Forecast section */}
-        <View style={styles.forecastContainer}>
-            {/* Location section */}
-            <Text style={styles.locationName}>
-              {currentLocation?.name || "Select a city"}
-              {currentLocation?.name && currentLocation?.country && ", "}
-              <Text style={styles.countryName}> 
-                {currentLocation?.country || ""}
+        
+        {/* Scrollable content */}
+        <ScrollView 
+          style={styles.mainScrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollViewContainer}
+        >
+          {/* Current Weather section */}
+          <View style={styles.forecastContainer}>
+              {/* Location section */}
+              <Text style={styles.locationName}>
+                {currentLocation?.name || "Select a city"}
+                {currentLocation?.name && currentLocation?.country && ", "}
+                <Text style={styles.countryName}> 
+                  {currentLocation?.country || ""}
+                </Text>
               </Text>
-            </Text>
-            {/* Weather image section */}
-            <View style={styles.weatherImageContainer}>
-              <Image 
-                source={
-                  current?.weathercode 
-                    ? getWeatherImage(getWeatherCondition(current.weathercode).image)
-                    : getWeatherImage('sun')
-                } 
-                style={styles.weatherImage}
-              />
-            </View>
-            {/* Temperature section */}
-            <View style={styles.temperatureContainer}>
-                <Text style={styles.temperature}>
-                    {current?.temperature_2m ? `${Math.round(current.temperature_2m)}` : ''}
-                    {current?.temperature_2m && <Text>&#176;C</Text>}
-                </Text>
-                <Text style={styles.weatherDescription}>
-                    {current?.weathercode !== undefined ? getWeatherCondition(current.weathercode).condition : ''}
-                </Text>
-                {current?.apparent_temperature && (
-                  <Text style={styles.feelsLike}>
-                    Feels like {Math.round(current.apparent_temperature)}&#176;C
+              {/* Weather image section */}
+              <View style={styles.weatherImageContainer}>
+                <Image 
+                  source={
+                    current?.weathercode 
+                      ? getWeatherImage(getWeatherCondition(current.weathercode).image)
+                      : getWeatherImage('sun')
+                  } 
+                  style={styles.weatherImage}
+                />
+              </View>
+              {/* Temperature section */}
+              <View style={styles.temperatureContainer}>
+                  <Text style={styles.temperature}>
+                      {current?.temperature_2m ? `${Math.round(current.temperature_2m)}` : ''}
+                      {current?.temperature_2m && <Text>&#176;C</Text>}
                   </Text>
-                )}
-            </View>
-            {/* Other statistics/details */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Image
-                    source={require('../assets/images/wind.png')}
-                    style={styles.statIcon} 
-                    />
-                <Text style={styles.statText}> 
-                    {current?.windspeed_10m ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
+                  <Text style={styles.weatherDescription}>
+                      {current?.weathercode !== undefined ? getWeatherCondition(current.weathercode).condition : ''}
+                  </Text>
+                  {current?.apparent_temperature && (
+                    <Text style={styles.feelsLike}>
+                      Feels like {Math.round(current.apparent_temperature)}&#176;C
                     </Text>
+                  )}
               </View>
+              {/* Other statistics/details */}
+              <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                <Image
-                    source={require('../assets/images/drop.png')}
-                    style={styles.statIcon} 
-                    />
-                <Text style={styles.statText}> 
-                    {current?.relativehumidity_2m ? `${current.relativehumidity_2m}%` : '--'}
-                    </Text>
+                  <Image
+                      source={require('../assets/images/wind.png')}
+                      style={styles.statIcon} 
+                      />
+                  <Text style={styles.statText}> 
+                      {current?.windspeed_10m ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
+                      </Text>
+                </View>
+                  <View style={styles.statItem}>
+                  <Image
+                      source={require('../assets/images/drop.png')}
+                      style={styles.statIcon} 
+                      />
+                  <Text style={styles.statText}> 
+                      {current?.relativehumidity_2m ? `${current.relativehumidity_2m}%` : '--'}
+                      </Text>
+                </View>
+                  <View style={styles.statItem}>
+                  {(() => {
+                    const todaySunrise = daily?.sunrise?.[0];
+                    const todaySunset = daily?.sunset?.[0];
+                    
+                    if (!todaySunrise || !todaySunset) {
+                      return (
+                        <>
+                          <Image source={require('../assets/images/sun.png')} style={styles.statIcon} />
+                          <Text style={styles.statText}>--</Text>
+                        </>
+                      );
+                    }
+                    
+                    // The API returns ISO datetime strings with the local timezone
+                    const sunriseDate = new Date(todaySunrise);
+                    const sunsetDate = new Date(todaySunset);
+                    
+                    // For determining morning vs afternoon, use the current time from the weather data
+                    // which is also in the city's timezone, or fall back to local time
+                    let currentHour;
+                    if (current?.time) {
+                      // Use the current time from weather data (city's timezone)
+                      const weatherCurrentTime = new Date(current.time);
+                      currentHour = weatherCurrentTime.getHours();
+                    } else {
+                      // Fallback to local device time
+                      currentHour = new Date().getHours();
+                    }
+                    
+                    // Show sunrise in morning (before 12 PM) and sunset in afternoon/evening (after 12 PM)
+                    const isAfterNoon = currentHour >= 12;
+                    
+                    if (isAfterNoon) {
+                      // Show sunset time in afternoon/evening
+                      const sunsetTime = sunsetDate.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      return (
+                        <>
+                          <Image source={require('../assets/images/sunset.png')} style={styles.statIcon} />
+                          <Text style={styles.statText}>{sunsetTime}</Text>
+                        </>
+                      );
+                    } else {
+                      // Show sunrise time in morning
+                      const sunriseTime = sunriseDate.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      return (
+                        <>
+                          <Image source={require('../assets/images/sunrise.png')} style={styles.statIcon} />
+                          <Text style={styles.statText}>{sunriseTime}</Text>
+                        </>
+                      );
+                    }
+                  })()}
+                </View>
               </View>
-                <View style={styles.statItem}>
-                {(() => {
-                  const todaySunrise = daily?.sunrise?.[0];
-                  const todaySunset = daily?.sunset?.[0];
-                  
-                  if (!todaySunrise || !todaySunset) {
-                    return (
-                      <>
-                        <Image source={require('../assets/images/sun.png')} style={styles.statIcon} />
-                        <Text style={styles.statText}>--</Text>
-                      </>
-                    );
-                  }
-                  
-                  // The API returns ISO datetime strings with the local timezone
-                  const sunriseDate = new Date(todaySunrise);
-                  const sunsetDate = new Date(todaySunset);
-                  
-                  // For determining morning vs afternoon, use the current time from the weather data
-                  // which is also in the city's timezone, or fall back to local time
-                  let currentHour;
-                  if (current?.time) {
-                    // Use the current time from weather data (city's timezone)
-                    const weatherCurrentTime = new Date(current.time);
-                    currentHour = weatherCurrentTime.getHours();
-                  } else {
-                    // Fallback to local device time
-                    currentHour = new Date().getHours();
-                  }
-                  
-                  // Show sunrise in morning (before 12 PM) and sunset in afternoon/evening (after 12 PM)
-                  const isAfterNoon = currentHour >= 12;
-                  
-                  if (isAfterNoon) {
-                    // Show sunset time in afternoon/evening
-                    const sunsetTime = sunsetDate.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    });
-                    return (
-                      <>
-                        <Image source={require('../assets/images/sunset.png')} style={styles.statIcon} />
-                        <Text style={styles.statText}>{sunsetTime}</Text>
-                      </>
-                    );
-                  } else {
-                    // Show sunrise time in morning
-                    const sunriseTime = sunriseDate.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    });
-                    return (
-                      <>
-                        <Image source={require('../assets/images/sunrise.png')} style={styles.statIcon} />
-                        <Text style={styles.statText}>{sunriseTime}</Text>
-                      </>
-                    );
-                  }
-                })()}
-              </View>
-            </View>
-        </View>
 
-        {/* Daily Forecast section */}
-        <View style={styles.dailyForecastContainer}>
-            <View style={styles.forecastHeader}>
-                <CalendarDaysIcon size="22" color="white" />
-                <Text style={styles.forecastHeaderText}> Daily forecast</Text>
-            </View>
-            <ScrollView
-                horizontal
-                contentContainerStyle={styles.scrollViewContent}
-                showsHorizontalScrollIndicator={false}
-            >
-                {daily?.time && daily.time.map((day, index) => {
-                  const weatherCode = daily.weathercode?.[index];
-                  const maxTemp = daily.temperature_2m_max?.[index];
-                  const minTemp = daily.temperature_2m_min?.[index];
-                  
-                  console.log(`Day ${index}:`, day, 'Formatted:', getDayName(day));
-                  
-                  return (
-                    <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                        <Image
-                            source={
-                              weatherCode 
-                                ? getWeatherImage(getWeatherCondition(weatherCode).image)
-                                : getWeatherImage('sun')
-                            }
-                            style={styles.forecastIcon} />
-                        <Text style={styles.dayText}>{getDayName(day)}</Text>
-                        <Text style={styles.tempText}>
-                          {maxTemp ? `${formatTemperature(maxTemp)}` : '--'}
-                          {maxTemp && <Text>&#176;C</Text>}
-                        </Text>
-                        {minTemp && (
-                          <Text style={styles.minTempText}>
-                            {formatTemperature(minTemp)}<Text>&#176;C</Text>
+              {/* Hourly Forecast section */}
+              <View style={styles.hourlyForecastInline}>
+                  <View style={styles.forecastHeader}>
+                      <CalendarDaysIcon size="22" color="white" />
+                      <Text style={styles.forecastHeaderText}> Hourly forecast</Text>
+                  </View>
+                  <ScrollView
+                      horizontal
+                      contentContainerStyle={styles.scrollViewContent}
+                      showsHorizontalScrollIndicator={false}
+                  >
+                      {hourly?.time && hourly.time.map((time, index) => {
+                        const weatherCode = hourly.weathercode?.[index];
+                        const temperature = hourly.temperature_2m?.[index];
+                        const feelsLike = hourly.apparent_temperature?.[index];
+
+                        return (
+                          <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
+                              <Image
+                                  source={
+                                    weatherCode
+                                      ? getWeatherImage(getWeatherCondition(weatherCode).image)
+                                      : getWeatherImage('sun')
+                                  }
+                                  style={styles.forecastIcon} />
+                              <Text style={styles.dayText}>{formatTime(time)}</Text>
+                              <Text style={styles.tempText}>
+                                {temperature ? `${formatTemperature(temperature)}` : '--'}
+                                {temperature && <Text>&#176;C</Text>}
+                              </Text>
+                              {feelsLike && (
+                                <Text style={styles.feelsLikeHourly}>
+                                  Feels {formatTemperature(feelsLike)}&#176;C
+                                </Text>
+                              )}
+                          </View>
+                        );
+                      })}
+                  </ScrollView>
+              </View>
+          </View>
+
+          {/* Daily Forecast section */}
+          <View style={styles.dailyForecastContainer}>
+              <View style={styles.forecastHeader}>
+                  <CalendarDaysIcon size="22" color="white" />
+                  <Text style={styles.forecastHeaderText}> Daily forecast</Text>
+              </View>
+              <ScrollView
+                  horizontal
+                  contentContainerStyle={styles.scrollViewContent}
+                  showsHorizontalScrollIndicator={false}
+              >
+                  {daily?.time && daily.time.map((day, index) => {
+                    const weatherCode = daily.weathercode?.[index];
+                    const maxTemp = daily.temperature_2m_max?.[index];
+                    const minTemp = daily.temperature_2m_min?.[index];
+                    
+                    console.log(`Day ${index}:`, day, 'Formatted:', getDayName(day));
+                    
+                    return (
+                      <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
+                          <Image
+                              source={
+                                weatherCode 
+                                  ? getWeatherImage(getWeatherCondition(weatherCode).image)
+                                  : getWeatherImage('sun')
+                              }
+                              style={styles.forecastIcon} />
+                          <Text style={styles.dayText}>{getDayName(day)}</Text>
+                          <Text style={styles.tempText}>
+                            {maxTemp ? `${formatTemperature(maxTemp)}` : '--'}
+                            {maxTemp && <Text>&#176;C</Text>}
                           </Text>
-                        )}
-                    </View>
-                  );
-                })}
-            </ScrollView>
-        </View>
+                          {minTemp && (
+                            <Text style={styles.minTempText}>
+                              {formatTemperature(minTemp)}<Text>&#176;C</Text>
+                            </Text>
+                          )}
+                      </View>
+                    );
+                  })}
+              </ScrollView>
+          </View>
+        </ScrollView>
 
       </SafeAreaView>
     </View>
@@ -407,9 +495,17 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  mainScrollView: {
+    flex: 1,
+  },
+  scrollViewContainer: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
   searchContainer: {
-    height: '7%',
+    height: 70,
     marginHorizontal: 16,
+    marginTop: 20,
     position: 'relative',
     zIndex: 50,
   },
@@ -475,9 +571,10 @@ const styles = StyleSheet.create({
   // Forecast section styles
   forecastContainer: {
     marginHorizontal: 16,
-    flex: 1,
     justifyContent: 'space-around',
-    marginBottom: 8,
+    marginBottom: 10,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   locationName: {
     color: 'white',
@@ -497,9 +594,11 @@ const styles = StyleSheet.create({
   weatherImage: {
     width: 208,
     height: 208,
+    marginVertical: 20,
   },
   temperatureContainer: {
     alignItems: 'center',
+    marginBottom: 30,
   },
   temperature: {
     textAlign: 'center',
@@ -527,6 +626,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginHorizontal: 16,
+    marginBottom: 10,
   },
   statItem: {
     flexDirection: 'row',
@@ -541,10 +641,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
-  },
-  // Daily Forecast section styles
-  dailyForecastContainer: {
-    marginBottom: 8,
   },
   forecastHeader: {
     flexDirection: 'row',
@@ -563,9 +659,10 @@ const styles = StyleSheet.create({
   forecastCard: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 96,
+    width: 110,
     borderRadius: 24,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     marginRight: 16,
   },
   forecastIcon: {
@@ -588,5 +685,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     marginTop: 2,
+  },
+  feelsLikeHourly: {
+    color: '#9ca3af',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Hourly Forecast section styles
+  hourlyForecastContainer: {
+    marginBottom: 30,
+    marginHorizontal: 16,
+  },
+  hourlyForecastInline: {
+    marginTop: 15,
+    marginBottom: 20,
+  },
+  // Daily Forecast section styles
+  dailyForecastContainer: {
+    marginBottom: 30,
+    marginHorizontal: 16,
   },
 });
