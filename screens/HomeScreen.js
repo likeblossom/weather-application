@@ -134,11 +134,13 @@ export default function HomeScreen({ navigation }) {
     const newSearchState = !showSearch;
     toggleSearch(newSearchState);
     
-    // If opening search, focus the input after a small delay
-    if (newSearchState && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current.focus();
-      }, 100);
+    // If opening search, focus the input immediately
+    if (newSearchState) {
+      requestAnimationFrame(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      });
     }
   };
 
@@ -700,11 +702,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 12,
+    marginLeft: 4,
   },
   seeMoreText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -714,7 +717,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 110,
     borderRadius: 24,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 8,
     marginRight: 16,
   },
@@ -754,11 +757,10 @@ const styles = StyleSheet.create({
   },
   hourlyForecastInline: {
     marginTop: 15,
-    marginBottom: 20,
+    marginBottom: 8,
   },
   // Daily Forecast section styles
   dailyForecastContainer: {
-    marginBottom: 30,
     marginHorizontal: 16,
   },
 });
