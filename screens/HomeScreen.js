@@ -1,14 +1,15 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect } from 'react';
-import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/outline';
-import { theme } from '../theme';
+import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon } from 'react-native-heroicons/outline';
 import { MapPinIcon } from 'react-native-heroicons/solid';
+import { theme } from '../theme';
 import {debounce} from 'lodash';
 import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
+import * as Location from 'expo-location';
 
 export default function HomeScreen() {
 
@@ -16,6 +17,8 @@ export default function HomeScreen() {
   const [locations, setLocations] = React.useState([]);
   const [weather, setWeather] = React.useState({});
   const [currentLocation, setCurrentLocation] = React.useState(null);
+  const [loadingLocation, setLoadingLocation] = React.useState(false);
+  const searchInputRef = useRef(null);
 
   // Load last searched city
   useEffect(() => {
@@ -57,6 +60,79 @@ export default function HomeScreen() {
     });
   }
 
+  const toggleSearchWithFocus = () => {
+    const newSearchState = !showSearch;
+    toggleSearch(newSearchState);
+    
+    // If opening search, focus the input after a small delay
+    if (newSearchState && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current.focus();
+      }, 100);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      setLoadingLocation(true);
+      
+      // Request permission to access location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Permission to access location was denied. Please enable location access in your device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Get current position
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Get location name using reverse geocoding
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        const place = reverseGeocode[0];
+        const locationData = {
+          name: place.city || place.subregion || place.region || 'Current Location',
+          country: place.country || '',
+          latitude,
+          longitude,
+        };
+
+        // Set this as current location and fetch weather
+        handleLocation(locationData, true);
+      } else {
+        // If reverse geocoding fails, still use coordinates
+        const locationData = {
+          name: 'Current Location',
+          country: '',
+          latitude,
+          longitude,
+        };
+        handleLocation(locationData, true);
+      }
+    } catch (error) {
+      console.log('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Unable to get your current location. Please try again or search for a city manually.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
   const handleSearch = value => {
     // Fetch locations
     if(value.length > 2){
@@ -91,6 +167,7 @@ export default function HomeScreen() {
           ]}>
             {showSearch ? (
               <TextInput
+                ref={searchInputRef}
                 onChangeText={handleTextDebounce}
                 placeholder="Search city"
                 placeholderTextColor={'lightgrey'}
@@ -98,12 +175,30 @@ export default function HomeScreen() {
               />
             ) : null}
 
-            <TouchableOpacity
-              onPress={() => toggleSearch(!showSearch)}
-              style={[styles.searchButton, {backgroundColor: theme.bgWhite(0.3)}]}
-            >
-              <MagnifyingGlassIcon size="25" color="white" />
-            </TouchableOpacity>
+            <View style={styles.searchActions}>
+              {/* Location button - only show when search is not active */}
+              {!showSearch && (
+                <TouchableOpacity
+                  onPress={getCurrentLocation}
+                  disabled={loadingLocation}
+                  style={[
+                    styles.locationButton, 
+                    {backgroundColor: theme.bgWhite(0.3)},
+                    loadingLocation && {opacity: 0.6}
+                  ]}
+                >
+                  <MapPinOutlineIcon size="25" color="white" />
+                </TouchableOpacity>
+              )}
+
+              {/* Search button */}
+              <TouchableOpacity
+                onPress={toggleSearchWithFocus}
+                style={[styles.searchButton, {backgroundColor: theme.bgWhite(0.3)}]}
+              >
+                <MagnifyingGlassIcon size="25" color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
           {
             locations.length > 0 && showSearch ? (
@@ -324,6 +419,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 25,
   },
+  searchActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   textInput: {
     paddingLeft: 24,
     height: 40,
@@ -332,10 +431,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
   },
+  locationButton: {
+    borderRadius: 25,
+    padding: 12,
+    margin: 4,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   searchButton: {
     borderRadius: 25,
     padding: 12,
     margin: 4,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchResults: {
     position: 'absolute',
