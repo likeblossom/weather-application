@@ -1,13 +1,15 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback } from 'react';
-import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDaysIcon, MagnifyingGlassIcon } from 'react-native-heroicons/outline';
-import { theme } from '../theme';
+import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon } from 'react-native-heroicons/outline';
 import { MapPinIcon } from 'react-native-heroicons/solid';
+import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature } from '../api/weather';
 import { getWeatherImage } from '../constants';
+import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
+import * as Location from 'expo-location';
 
 export default function HomeScreen() {
 
@@ -15,8 +17,22 @@ export default function HomeScreen() {
   const [locations, setLocations] = React.useState([]);
   const [weather, setWeather] = React.useState({});
   const [currentLocation, setCurrentLocation] = React.useState(null);
+  const [loadingLocation, setLoadingLocation] = React.useState(false);
+  const searchInputRef = useRef(null);
 
-  const handleLocation = (location) => {
+  // Load last searched city
+  useEffect(() => {
+    loadLastSearchedCity();
+  }, []);
+
+  const loadLastSearchedCity = async () => {
+    const cityData = await loadLastCity();
+    if (cityData) {
+      handleLocation(cityData, false); // false to avoid saving again
+    }
+  };
+
+  const handleLocation = (location, shouldSave = true) => {
     console.log('Selected location:', location);
     console.log('City name:', location.name);
     console.log('Country:', location.country);
@@ -25,6 +41,11 @@ export default function HomeScreen() {
     toggleSearch(false); // Hide search dropdown
     setCurrentLocation(location); // Store the selected location
     
+    // Save to AsyncStorage if this is a new selection (not loading from storage)
+    if (shouldSave) {
+      saveLastCity(location);
+    }
+    
     // Use the latitude and longitude from the selected location
     fetchWeatherForecast({
       latitude: location.latitude,
@@ -32,10 +53,85 @@ export default function HomeScreen() {
     }).then(data => {
       setWeather(data);
       console.log('Got forecast:', data);
+      console.log('Daily data:', data?.daily);
+      console.log('Daily time array:', data?.daily?.time);
       console.log('Weather code:', data?.current?.weathercode);
       console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
     });
   }
+
+  const toggleSearchWithFocus = () => {
+    const newSearchState = !showSearch;
+    toggleSearch(newSearchState);
+    
+    // If opening search, focus the input after a small delay
+    if (newSearchState && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current.focus();
+      }, 100);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      setLoadingLocation(true);
+      
+      // Request permission to access location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Permission to access location was denied. Please enable location access in your device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Get current position
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Get location name using reverse geocoding
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        const place = reverseGeocode[0];
+        const locationData = {
+          name: place.city || place.subregion || place.region || 'Current Location',
+          country: place.country || '',
+          latitude,
+          longitude,
+        };
+
+        // Set this as current location and fetch weather
+        handleLocation(locationData, true);
+      } else {
+        // If reverse geocoding fails, still use coordinates
+        const locationData = {
+          name: 'Current Location',
+          country: '',
+          latitude,
+          longitude,
+        };
+        handleLocation(locationData, true);
+      }
+    } catch (error) {
+      console.log('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Unable to get your current location. Please try again or search for a city manually.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
 
   const handleSearch = value => {
     // Fetch locations
@@ -49,8 +145,8 @@ export default function HomeScreen() {
     }
   }
 
-  const handleTextDebounce = useCallback(debounce(handleSearch, 900), []);
-  const {current} = weather;
+  const handleTextDebounce = useCallback(debounce(handleSearch, 700), []);
+  const {current, daily} = weather;
 
   return (
     <View style={styles.container}>
@@ -71,6 +167,7 @@ export default function HomeScreen() {
           ]}>
             {showSearch ? (
               <TextInput
+                ref={searchInputRef}
                 onChangeText={handleTextDebounce}
                 placeholder="Search city"
                 placeholderTextColor={'lightgrey'}
@@ -78,12 +175,30 @@ export default function HomeScreen() {
               />
             ) : null}
 
-            <TouchableOpacity
-              onPress={() => toggleSearch(!showSearch)}
-              style={[styles.searchButton, {backgroundColor: theme.bgWhite(0.3)}]}
-            >
-              <MagnifyingGlassIcon size="25" color="white" />
-            </TouchableOpacity>
+            <View style={styles.searchActions}>
+              {/* Location button - only show when search is not active */}
+              {!showSearch && (
+                <TouchableOpacity
+                  onPress={getCurrentLocation}
+                  disabled={loadingLocation}
+                  style={[
+                    styles.locationButton, 
+                    {backgroundColor: theme.bgWhite(0.3)},
+                    loadingLocation && {opacity: 0.6}
+                  ]}
+                >
+                  <MapPinOutlineIcon size="25" color="white" />
+                </TouchableOpacity>
+              )}
+
+              {/* Search button */}
+              <TouchableOpacity
+                onPress={toggleSearchWithFocus}
+                style={[styles.searchButton, {backgroundColor: theme.bgWhite(0.3)}]}
+              >
+                <MagnifyingGlassIcon size="25" color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
           {
             locations.length > 0 && showSearch ? (
@@ -154,7 +269,7 @@ export default function HomeScreen() {
                     style={styles.statIcon} 
                     />
                 <Text style={styles.statText}> 
-                    10 km/h
+                    {current?.windspeed_10m ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
                     </Text>
               </View>
                 <View style={styles.statItem}>
@@ -163,17 +278,70 @@ export default function HomeScreen() {
                     style={styles.statIcon} 
                     />
                 <Text style={styles.statText}> 
-                    23%
+                    {current?.relativehumidity_2m ? `${current.relativehumidity_2m}%` : '--'}
                     </Text>
               </View>
                 <View style={styles.statItem}>
-                <Image
-                    source={require('../assets/images/sun.png')}
-                    style={styles.statIcon} 
-                    />
-                <Text style={styles.statText}> 
-                    8:52 AM
-                    </Text>
+                {(() => {
+                  const todaySunrise = daily?.sunrise?.[0];
+                  const todaySunset = daily?.sunset?.[0];
+                  
+                  if (!todaySunrise || !todaySunset) {
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sun.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>--</Text>
+                      </>
+                    );
+                  }
+                  
+                  // The API returns ISO datetime strings with the local timezone
+                  const sunriseDate = new Date(todaySunrise);
+                  const sunsetDate = new Date(todaySunset);
+                  
+                  // For determining morning vs afternoon, use the current time from the weather data
+                  // which is also in the city's timezone, or fall back to local time
+                  let currentHour;
+                  if (current?.time) {
+                    // Use the current time from weather data (city's timezone)
+                    const weatherCurrentTime = new Date(current.time);
+                    currentHour = weatherCurrentTime.getHours();
+                  } else {
+                    // Fallback to local device time
+                    currentHour = new Date().getHours();
+                  }
+                  
+                  // Show sunrise in morning (before 12 PM) and sunset in afternoon/evening (after 12 PM)
+                  const isAfterNoon = currentHour >= 12;
+                  
+                  if (isAfterNoon) {
+                    // Show sunset time in afternoon/evening
+                    const sunsetTime = sunsetDate.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sunset.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>{sunsetTime}</Text>
+                      </>
+                    );
+                  } else {
+                    // Show sunrise time in morning
+                    const sunriseTime = sunriseDate.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sunrise.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>{sunriseTime}</Text>
+                      </>
+                    );
+                  }
+                })()}
               </View>
             </View>
         </View>
@@ -189,55 +357,35 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.scrollViewContent}
                 showsHorizontalScrollIndicator={false}
             >
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Monday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Tuesday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Wednesday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Thursday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Friday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Saturday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
-                <View style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
-                    <Image
-                        source={require('../assets/images/heavyrain.png')}
-                        style={styles.forecastIcon} />
-                    <Text style={styles.dayText}>Sunday</Text>
-                    <Text style={styles.tempText}> 20&#176; </Text>
-                </View>
+                {daily?.time && daily.time.map((day, index) => {
+                  const weatherCode = daily.weathercode?.[index];
+                  const maxTemp = daily.temperature_2m_max?.[index];
+                  const minTemp = daily.temperature_2m_min?.[index];
+                  
+                  console.log(`Day ${index}:`, day, 'Formatted:', getDayName(day));
+                  
+                  return (
+                    <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
+                        <Image
+                            source={
+                              weatherCode 
+                                ? getWeatherImage(getWeatherCondition(weatherCode).image)
+                                : getWeatherImage('sun')
+                            }
+                            style={styles.forecastIcon} />
+                        <Text style={styles.dayText}>{getDayName(day)}</Text>
+                        <Text style={styles.tempText}>
+                          {maxTemp ? `${formatTemperature(maxTemp)}` : '--'}
+                          {maxTemp && <Text>&#176;C</Text>}
+                        </Text>
+                        {minTemp && (
+                          <Text style={styles.minTempText}>
+                            {formatTemperature(minTemp)}<Text>&#176;C</Text>
+                          </Text>
+                        )}
+                    </View>
+                  );
+                })}
             </ScrollView>
         </View>
 
@@ -271,6 +419,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 25,
   },
+  searchActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   textInput: {
     paddingLeft: 24,
     height: 40,
@@ -279,10 +431,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
   },
+  locationButton: {
+    borderRadius: 25,
+    padding: 12,
+    margin: 4,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   searchButton: {
     borderRadius: 25,
     padding: 12,
     margin: 4,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchResults: {
     position: 'absolute',
@@ -317,13 +482,13 @@ const styles = StyleSheet.create({
   locationName: {
     color: 'white',
     textAlign: 'center',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
   },
   countryName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '600',
-    color: '#d1d5db',
+    color: '#c7caceff',
   },
   weatherImageContainer: {
     flexDirection: 'row',
@@ -411,10 +576,17 @@ const styles = StyleSheet.create({
   dayText: {
     color: 'white',
     marginBottom: 4,
+    fontWeight: 'bold',
   },
   tempText: {
     color: 'white',
     fontSize: 20, 
     fontWeight: '600', 
+  },
+  minTempText: {
+    color: '#9ca3af',
+    fontSize: 18,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });

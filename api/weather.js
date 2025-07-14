@@ -40,21 +40,21 @@ export const getWeatherCondition = (weatherCode) => {
     3: { condition: 'Overcast', image: 'cloud' },
     45: { condition: 'Foggy', image: 'mist' },
     48: { condition: 'Rime Fog', image: 'mist' },
-    51: { condition: 'Light Drizzle', image: 'moderaterain' },
-    53: { condition: 'Moderate Drizzle', image: 'moderaterain' },
-    55: { condition: 'Dense Drizzle', image: 'moderaterain' },
+    51: { condition: 'Light Drizzle', image: 'drizzle' },
+    53: { condition: 'Moderate Drizzle', image: 'drizzle' },
+    55: { condition: 'Dense Drizzle', image: 'rain' },
     61: { condition: 'Light Rain', image: 'moderaterain' },
-    63: { condition: 'Moderate Rain', image: 'moderaterain' },
+    63: { condition: 'Moderate Rain', image: 'rain' },
     65: { condition: 'Heavy Rain', image: 'heavyrain' },
-    71: { condition: 'Light Snow', image: 'moderaterain' },
-    73: { condition: 'Moderate Snow', image: 'moderaterain' },
-    75: { condition: 'Heavy Snow', image: 'heavyrain' },
+    71: { condition: 'Light Snow', image: 'snow' },
+    73: { condition: 'Moderate Snow', image: 'snow' },
+    75: { condition: 'Heavy Snow', image: 'snow' },
     80: { condition: 'Light Showers', image: 'moderaterain' },
-    81: { condition: 'Moderate Showers', image: 'moderaterain' },
+    81: { condition: 'Moderate Showers', image: 'rain' },
     82: { condition: 'Violent Showers', image: 'heavyrain' },
-    95: { condition: 'Thunderstorm', image: 'heavyrain' },
-    96: { condition: 'Thunderstorm with Hail', image: 'heavyrain' },
-    99: { condition: 'Severe Thunderstorm', image: 'heavyrain' }
+    95: { condition: 'Thunderstorm', image: 'thunder' },
+    96: { condition: 'Thunderstorm with Hail', image: 'thunder' },
+    99: { condition: 'Severe Thunderstorm', image: 'thunder' }
   };
   
   return weatherConditions[weatherCode] || { condition: 'Unknown', image: 'sun' };
@@ -80,18 +80,23 @@ export const formatTime = (timeString) => {
   });
 };
 
-// Helper function to get day name
-export const getDayName = (dateString) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+// Helper function to get day name with timezone awareness
+export const getDayName = (dateString, timezoneOffset = 0) => {
+  // Parse the date string (format: "YYYY-MM-DD")
+  const [year, month, day] = dateString.split('-').map(Number);
+  const apiDate = new Date(year, month - 1, day); // month is 0-indexed
   
-  if (date.toDateString() === today.toDateString()) {
+  // Get current date, adjusting for potential timezone differences
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  
+
+  if (apiDate.getTime() === today.getTime()) {
     return 'Today';
-  } else if (date.toDateString() === tomorrow.toDateString()) {
+  } else if (apiDate.getTime() === tomorrow.getTime()) {
     return 'Tomorrow';
   } else {
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
+    return apiDate.toLocaleDateString('en-US', { weekday: 'long' });
   }
 };
