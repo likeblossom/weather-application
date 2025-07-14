@@ -51,6 +51,43 @@ export default function HomeScreen() {
       latitude: location.latitude,
       longitude: location.longitude
     }).then(data => {
+      // Process hourly data to show only next 12 hours from current time in city's timezone
+      if (data?.hourly?.time && data?.current?.time) {
+        // Use the current time from the API response (city's timezone)
+        const currentTimeInCity = new Date(data.current.time);
+        const currentHour = currentTimeInCity.getHours();
+        const currentDate = currentTimeInCity.getDate();
+        
+        // Find the index of the current hour in the hourly data
+        let startIndex = 0;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+          const hourlyTime = new Date(data.hourly.time[i]);
+          // Check if this hour matches the current hour and date in the city's timezone
+          if (hourlyTime.getHours() === currentHour && hourlyTime.getDate() === currentDate) {
+            startIndex = i;
+            break;
+          }
+          // If passed the current time, use the next available hour
+          if (hourlyTime >= currentTimeInCity) {
+            startIndex = i;
+            break;
+          }
+        }
+        
+        // Slice the arrays to get next 13 hours
+        const next13Hours = {
+          ...data.hourly,
+          time: data.hourly.time.slice(startIndex, startIndex + 13),
+          temperature_2m: data.hourly.temperature_2m?.slice(startIndex, startIndex + 13),
+          apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 13),
+          weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 13),
+          relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 13),
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13)
+        };
+        
+        data.hourly = next13Hours;
+      }
+      
       setWeather(data);
       console.log('Got forecast:', data);
       console.log('Daily data:', data?.daily);
@@ -535,8 +572,8 @@ const styles = StyleSheet.create({
   forecastContainer: {
     marginHorizontal: 16,
     justifyContent: 'space-around',
-    marginBottom: 40,
-    paddingTop: 20,
+    marginBottom: 10,
+    paddingTop: 10,
     paddingBottom: 20,
   },
   locationName: {
@@ -622,9 +659,10 @@ const styles = StyleSheet.create({
   forecastCard: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 96,
+    width: 110,
     borderRadius: 24,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     marginRight: 16,
   },
   forecastIcon: {
@@ -650,7 +688,7 @@ const styles = StyleSheet.create({
   },
   feelsLikeHourly: {
     color: '#9ca3af',
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '500',
     marginTop: 2,
     textAlign: 'center',
