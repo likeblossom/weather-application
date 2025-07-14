@@ -187,13 +187,66 @@ export default function HomeScreen() {
                     </Text>
               </View>
                 <View style={styles.statItem}>
-                <Image
-                    source={require('../assets/images/sun.png')}
-                    style={styles.statIcon} 
-                    />
-                <Text style={styles.statText}> 
-                    8:52 AM
-                    </Text>
+                {(() => {
+                  const todaySunrise = daily?.sunrise?.[0];
+                  const todaySunset = daily?.sunset?.[0];
+                  
+                  if (!todaySunrise || !todaySunset) {
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sun.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>--</Text>
+                      </>
+                    );
+                  }
+                  
+                  // The API returns ISO datetime strings with the local timezone
+                  const sunriseDate = new Date(todaySunrise);
+                  const sunsetDate = new Date(todaySunset);
+                  
+                  // For determining morning vs afternoon, use the current time from the weather data
+                  // which is also in the city's timezone, or fall back to local time
+                  let currentHour;
+                  if (current?.time) {
+                    // Use the current time from weather data (city's timezone)
+                    const weatherCurrentTime = new Date(current.time);
+                    currentHour = weatherCurrentTime.getHours();
+                  } else {
+                    // Fallback to local device time
+                    currentHour = new Date().getHours();
+                  }
+                  
+                  // Show sunrise in morning (before 12 PM) and sunset in afternoon/evening (after 12 PM)
+                  const isAfterNoon = currentHour >= 12;
+                  
+                  if (isAfterNoon) {
+                    // Show sunset time in afternoon/evening
+                    const sunsetTime = sunsetDate.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sunset.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>{sunsetTime}</Text>
+                      </>
+                    );
+                  } else {
+                    // Show sunrise time in morning
+                    const sunriseTime = sunriseDate.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    return (
+                      <>
+                        <Image source={require('../assets/images/sunrise.png')} style={styles.statIcon} />
+                        <Text style={styles.statText}>{sunriseTime}</Text>
+                      </>
+                    );
+                  }
+                })()}
               </View>
             </View>
         </View>

@@ -40,21 +40,21 @@ export const getWeatherCondition = (weatherCode) => {
     3: { condition: 'Overcast', image: 'cloud' },
     45: { condition: 'Foggy', image: 'mist' },
     48: { condition: 'Rime Fog', image: 'mist' },
-    51: { condition: 'Light Drizzle', image: 'moderaterain' },
-    53: { condition: 'Moderate Drizzle', image: 'moderaterain' },
-    55: { condition: 'Dense Drizzle', image: 'moderaterain' },
+    51: { condition: 'Light Drizzle', image: 'drizzle' },
+    53: { condition: 'Moderate Drizzle', image: 'drizzle' },
+    55: { condition: 'Dense Drizzle', image: 'rain' },
     61: { condition: 'Light Rain', image: 'moderaterain' },
-    63: { condition: 'Moderate Rain', image: 'moderaterain' },
+    63: { condition: 'Moderate Rain', image: 'rain' },
     65: { condition: 'Heavy Rain', image: 'heavyrain' },
-    71: { condition: 'Light Snow', image: 'moderaterain' },
-    73: { condition: 'Moderate Snow', image: 'moderaterain' },
-    75: { condition: 'Heavy Snow', image: 'heavyrain' },
+    71: { condition: 'Light Snow', image: 'snow' },
+    73: { condition: 'Moderate Snow', image: 'snow' },
+    75: { condition: 'Heavy Snow', image: 'snow' },
     80: { condition: 'Light Showers', image: 'moderaterain' },
-    81: { condition: 'Moderate Showers', image: 'moderaterain' },
+    81: { condition: 'Moderate Showers', image: 'rain' },
     82: { condition: 'Violent Showers', image: 'heavyrain' },
-    95: { condition: 'Thunderstorm', image: 'heavyrain' },
-    96: { condition: 'Thunderstorm with Hail', image: 'heavyrain' },
-    99: { condition: 'Severe Thunderstorm', image: 'heavyrain' }
+    95: { condition: 'Thunderstorm', image: 'thunder' },
+    96: { condition: 'Thunderstorm with Hail', image: 'thunder' },
+    99: { condition: 'Severe Thunderstorm', image: 'thunder' }
   };
   
   return weatherConditions[weatherCode] || { condition: 'Unknown', image: 'sun' };
@@ -91,7 +91,7 @@ export const getDayName = (dateString, timezoneOffset = 0) => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   
-  
+
   if (apiDate.getTime() === today.getTime()) {
     return 'Today';
   } else if (apiDate.getTime() === tomorrow.getTime()) {

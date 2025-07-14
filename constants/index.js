@@ -5,6 +5,10 @@ export const weatherImages = {
   'mist': require('../assets/images/mist.png'),
   'moderaterain': require('../assets/images/moderaterain.png'),
   'heavyrain': require('../assets/images/heavyrain.png'),
+  'drizzle': require('../assets/images/drizzle.png'),
+  'rain': require('../assets/images/moderaterain.png'),
+  'snow': require('../assets/images/snow.png'),
+  'thunder': require('../assets/images/thunder.png'),
 };
 
 export const getWeatherImage = (imageName) => {
