@@ -11,11 +11,12 @@ import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
 
   const [showSearch, toggleSearch] = React.useState(false);
   const [locations, setLocations] = React.useState([]);
   const [weather, setWeather] = React.useState({});
+  const [fullHourlyData, setFullHourlyData] = React.useState(null);
   const [currentLocation, setCurrentLocation] = React.useState(null);
   const [loadingLocation, setLoadingLocation] = React.useState(false);
   const searchInputRef = useRef(null);
@@ -51,30 +52,56 @@ export default function HomeScreen() {
       latitude: location.latitude,
       longitude: location.longitude
     }).then(data => {
-      // Process hourly data to show only next 12 hours from current time in city's timezone
+      console.log('API Response structure:', {
+        hasData: !!data,
+        hasCurrent: !!data?.current,
+        hasHourly: !!data?.hourly,
+        hasDaily: !!data?.daily
+      });
+      
+      if (!data) {
+        console.error('No data received from weather API');
+        return;
+      }
+      
+      if (!data.current) {
+        console.error('No current weather data received');
+        return;
+      }
+      
+      if (!data.hourly || !data.hourly.time) {
+        console.error('No hourly weather data received');
+        return;
+      }
+      
+      // Store the full hourly data for the detailed view (24 hours)
       if (data?.hourly?.time && data?.current?.time) {
-        // Use the current time from the API response (city's timezone)
         const currentTimeInCity = new Date(data.current.time);
-        const currentHour = currentTimeInCity.getHours();
-        const currentDate = currentTimeInCity.getDate();
-        
-        // Find the index of the current hour in the hourly data
         let startIndex = 0;
+        
         for (let i = 0; i < data.hourly.time.length; i++) {
           const hourlyTime = new Date(data.hourly.time[i]);
-          // Check if this hour matches the current hour and date in the city's timezone
-          if (hourlyTime.getHours() === currentHour && hourlyTime.getDate() === currentDate) {
-            startIndex = i;
-            break;
-          }
-          // If passed the current time, use the next available hour
           if (hourlyTime >= currentTimeInCity) {
             startIndex = i;
             break;
           }
         }
         
-        // Slice the arrays to get next 13 hours
+        // Store full 24 hours for detailed view
+        const full24Hours = {
+          ...data.hourly,
+          time: data.hourly.time.slice(startIndex, startIndex + 24),
+          temperature_2m: data.hourly.temperature_2m?.slice(startIndex, startIndex + 24),
+          apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 24),
+          weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 24),
+          relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 24),
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 24),
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 24)
+        };
+        
+        setFullHourlyData(full24Hours);
+        
+        // Process hourly data to show only next 13 hours from current time in city's timezone for home screen
         const next13Hours = {
           ...data.hourly,
           time: data.hourly.time.slice(startIndex, startIndex + 13),
@@ -82,7 +109,8 @@ export default function HomeScreen() {
           apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 13),
           weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 13),
           relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 13),
-          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13)
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13),
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 13)
         };
         
         data.hourly = next13Hours;
@@ -96,6 +124,9 @@ export default function HomeScreen() {
       console.log('Hourly time array:', data?.hourly?.time);
       console.log('Weather code:', data?.current?.weathercode);
       console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
+    }).catch(error => {
+      console.error('Error fetching weather data:', error);
+      Alert.alert('Error', 'Failed to fetch weather data. Please try again.');
     });
   }
 
@@ -396,6 +427,15 @@ export default function HomeScreen() {
                   <View style={styles.forecastHeader}>
                       <CalendarDaysIcon size="22" color="white" />
                       <Text style={styles.forecastHeaderText}> Hourly forecast</Text>
+                      <TouchableOpacity 
+                        style={styles.seeMoreButton}
+                        onPress={() => navigation.navigate('HourlyForecast', {
+                          hourlyData: fullHourlyData,
+                          locationName: currentLocation?.name ? `${currentLocation.name}${currentLocation.country ? `, ${currentLocation.country}` : ''}` : 'Unknown Location'
+                        })}
+                      >
+                        <Text style={styles.seeMoreText}>See more</Text>
+                      </TouchableOpacity>
                   </View>
                   <ScrollView
                       horizontal
@@ -645,6 +685,7 @@ const styles = StyleSheet.create({
   forecastHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginHorizontal: 20,
     marginBottom: 12,
   },
@@ -652,6 +693,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     marginLeft: 8,
+    flex: 1,
+  },
+  seeMoreButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+  },
+  seeMoreText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   scrollViewContent: {
     paddingHorizontal: 15,

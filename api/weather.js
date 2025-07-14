@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const forecastEndpoint = params => 
-  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=7`;
+  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=7`;
 
 const locationsEndpoint = params => 
   `https://geocoding-api.open-meteo.com/v1/search?name=${params.cityName}&count=10&language=en&format=json`;
