@@ -1,9 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
-import tw from 'twrnc';
 import AppNavigation from './navigation/appNavigation';
 import { registerRootComponent } from 'expo';
-import "./global.css";
 
 function App() {
   return (
