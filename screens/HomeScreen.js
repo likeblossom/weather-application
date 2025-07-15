@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   hourlyForecastInline: {
-    marginTop: 15,
+    marginTop: 30,
     marginBottom: 8,
   },
   // Daily Forecast section styles
