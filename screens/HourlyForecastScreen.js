@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     flexWrap: 'wrap',
-    width: 85,
+    width: 90,
   },
   temperatureSection: {
     alignItems: 'flex-end',
@@ -202,18 +202,21 @@ const styles = StyleSheet.create({
   },
   tempText: {
     color: 'white',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     marginTop: 6,
+    marginLeft: 6,
   },
   feelsLikeText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 15,
-    marginTop: 4,
+    fontSize: 14,
+    marginTop: 6,
+    marginLeft: 6,
+    fontWeight: '500',
   },
   detailsSection: {
     alignItems: 'flex-start',
-    marginLeft: 14,
+    marginLeft: 16,
   },
   detailsContainer: {
     flexDirection: 'column',

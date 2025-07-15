@@ -9,6 +9,12 @@ export const weatherImages = {
   'rain': require('../assets/images/moderaterain.png'),
   'snow': require('../assets/images/snow.png'),
   'thunder': require('../assets/images/thunder.png'),
+  'moon': require('../assets/images/moon.png'),
+  'cloudymoon': require('../assets/images/cloudymoon.png'),
+  'moonrain': require('../assets/images/moonrain.png'),
+  'moonthunder': require('../assets/images/moonthunder.png'),
+  'foggymoon': require('../assets/images/foggymoon.png'),
+  'moonsnow': require('../assets/images/moonsnow.png'),
 };
 
 export const getWeatherImage = (imageName) => {

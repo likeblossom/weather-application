@@ -6,7 +6,7 @@ import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon,
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription, formatPM25, getPM25Description, getPM25Color, formatDust, getDustDescription } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription, formatPM25, getPM25Description, getPM25Color, formatDust, getDustDescription, getWeatherImageWithTime } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
@@ -96,7 +96,8 @@ export default function HomeScreen({ navigation }) {
           weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 24),
           relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 24),
           windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 24),
-          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 24)
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 24),
+          is_day: data.hourly.is_day?.slice(startIndex, startIndex + 24)
         };
         
         setFullHourlyData(full24Hours);
@@ -110,7 +111,8 @@ export default function HomeScreen({ navigation }) {
           weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 13),
           relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 13),
           windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13),
-          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 13)
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 13),
+          is_day: data.hourly.is_day?.slice(startIndex, startIndex + 13)
         };
         
         data.hourly = next13Hours;
@@ -318,8 +320,11 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.weatherImageContainer}>
                 <Image 
                   source={
-                    current?.weathercode 
-                      ? getWeatherImage(getWeatherCondition(current.weathercode).image)
+                    (current?.weathercode !== undefined && current?.weathercode !== null)
+                      ? getWeatherImage(getWeatherImageWithTime(
+                          current.weathercode, 
+                          current.is_day
+                        ))
                       : getWeatherImage('sun')
                   } 
                   style={styles.weatherImage}
@@ -542,13 +547,17 @@ export default function HomeScreen({ navigation }) {
                         const weatherCode = hourly.weathercode?.[index];
                         const temperature = hourly.temperature_2m?.[index];
                         const feelsLike = hourly.apparent_temperature?.[index];
+                        const isDay = hourly.is_day?.[index];
 
                         return (
                           <View key={index} style={[styles.forecastCard, {backgroundColor: theme.bgWhite(0.15)}]}>
                               <Image
                                   source={
                                     weatherCode
-                                      ? getWeatherImage(getWeatherCondition(weatherCode).image)
+                                      ? getWeatherImage(getWeatherImageWithTime(
+                                          weatherCode,
+                                          isDay
+                                        ))
                                       : getWeatherImage('sun')
                                   }
                                   style={styles.forecastIcon} />

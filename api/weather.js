@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const forecastEndpoint = params => 
-  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index,visibility,pressure_msl&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
+  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index,visibility,pressure_msl,is_day&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index,is_day&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
 
 const airQualityEndpoint = params => 
   `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${params.latitude}&longitude=${params.longitude}&current=pm2_5,dust&timezone=auto`;
@@ -253,4 +253,47 @@ export const getDustDescription = (dust) => {
   } else {
     return 'Very high';
   }
+};
+
+
+export const getWeatherImageWithTime = (weatherCode, isDay) => {
+  const baseCondition = getWeatherCondition(weatherCode);
+  
+  // If we don't have is_day data, use default behavior
+  if (isDay === null || isDay === undefined) {
+    return baseCondition.image;
+  }
+  
+  // If it's nighttime (is_day = 0)
+  if (isDay === 0) {
+    // For clear sky conditions at night
+    if (weatherCode === 0 || weatherCode === 1) {
+      return 'moon';
+    }
+    // For cloudy conditions at night
+    else if (weatherCode === 2 || weatherCode === 3) {
+      return 'cloudymoon';
+    }
+    // For fog conditions at night
+    else if (weatherCode === 45 || weatherCode === 48) {
+      return 'foggymoon';
+    }
+    // For snow conditions at night
+    else if (weatherCode === 71 || weatherCode === 73 || weatherCode === 75) {
+      return 'moonsnow';
+    }
+    // For rain/drizzle/shower conditions at night
+    else if (weatherCode === 51 || weatherCode === 53 || weatherCode === 55 || // Drizzle
+             weatherCode === 61 || weatherCode === 63 || weatherCode === 65 || // Rain
+             weatherCode === 80 || weatherCode === 81 || weatherCode === 82) { // Showers
+      return 'moonrain';
+    }
+    // For thunderstorm conditions at night
+    else if (weatherCode === 95 || weatherCode === 96 || weatherCode === 99) {
+      return 'moonthunder';
+    }
+  }
+  
+  // For all other conditions or daytime, use the original image
+  return baseCondition.image;
 };
