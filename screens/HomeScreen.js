@@ -2,11 +2,11 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon } from 'react-native-heroicons/outline';
+import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon, SunIcon, EyeIcon } from 'react-native-heroicons/outline';
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
@@ -424,6 +424,68 @@ export default function HomeScreen({ navigation }) {
                 </View>
               </View>
 
+              {/* Weather Details Card */}
+              <View style={styles.weatherDetailsCard}>
+                <Text style={styles.weatherDetailsTitle}>Today's Details</Text>
+                <View style={styles.weatherDetailsGrid}>
+                  {/* UV Index */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <SunIcon size="20" color="#f59e0b" />
+                      <Text style={styles.weatherDetailLabel}>UV Index</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {current?.uv_index ? Math.round(current.uv_index) : '--'}
+                    </Text>
+                    <Text style={[styles.weatherDetailSubtext, { color: getUVIndexInfo(current?.uv_index).color }]}>
+                      {getUVIndexInfo(current?.uv_index).level}
+                    </Text>
+                  </View>
+
+                  {/* Visibility */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <EyeIcon size="20" color="white" />
+                      <Text style={styles.weatherDetailLabel}>Visibility</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatVisibility(current?.visibility)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>{getVisibilityDescription(current?.visibility)}</Text>
+                  </View>
+
+                  {/* Pressure */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/wind.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: 'white' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Pressure</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatPressure(current?.pressure_msl)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>Sea level</Text>
+                  </View>
+
+                  {/* Precipitation */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/heavyrain.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Probability</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {hourly?.precipitation_probability?.[0] !== undefined ? `${hourly.precipitation_probability[0]}%` : '--'}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>Currently</Text>
+                  </View>
+                </View>
+              </View>
+
               {/* Hourly Forecast section */}
               <View style={styles.hourlyForecastInline}>
                   <View style={styles.forecastHeader}>
@@ -762,5 +824,56 @@ const styles = StyleSheet.create({
   // Daily Forecast section styles
   dailyForecastContainer: {
     marginHorizontal: 16,
+  },
+  // Weather Details Card styles
+  weatherDetailsCard: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    padding: 20,
+  },
+  weatherDetailsTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  weatherDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  weatherDetailItem: {
+    width: '48%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  weatherDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  weatherDetailLabel: {
+    color: '#ffffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  weatherDetailValue: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  weatherDetailSubtext: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

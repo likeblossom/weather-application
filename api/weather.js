@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const forecastEndpoint = params => 
-  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=7`;
+  `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index,visibility,pressure_msl&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
 
 const locationsEndpoint = params => 
   `https://geocoding-api.open-meteo.com/v1/search?name=${params.cityName}&count=10&language=en&format=json`;
@@ -98,5 +98,70 @@ export const getDayName = (dateString, timezoneOffset = 0) => {
     return 'Tomorrow';
   } else {
     return apiDate.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+};
+
+// Helper function to format visibility
+export const formatVisibility = (visibility) => {
+  if (!visibility) return '--';
+  return `${Math.round(visibility / 1000)} km`;
+};
+
+// Helper function to get visibility description
+export const getVisibilityDescription = (visibility) => {
+  if (!visibility) return 'No data';
+  
+  const visibilityKm = visibility / 1000;
+  
+  if (visibilityKm >= 20) {
+    return 'Excellent';
+  } else if (visibilityKm >= 10) {
+    return 'Very good';
+  } else if (visibilityKm >= 4) {
+    return 'Good';
+  } else if (visibilityKm >= 2) {
+    return 'Moderate';
+  } else if (visibilityKm >= 1) {
+    return 'Poor';
+  } else {
+    return 'Very poor';
+  }
+};
+
+// Helper function to format pressure
+export const formatPressure = (pressure) => {
+  if (!pressure) return '--';
+  return `${Math.round(pressure)} hPa`;
+};
+
+// Helper function to get UV index level and recommendation
+export const getUVIndexInfo = (uvIndex) => {
+  if (!uvIndex || uvIndex < 0) return { level: '--', recommendation: 'No data available', color: '#9ca3af' };
+  
+  if (uvIndex < 3) {
+    return { 
+      level: 'Low', 
+      color: '#22c55e' 
+    };
+  } else if (uvIndex < 6) {
+    return { 
+      level: 'Moderate', 
+      color: '#eab308' 
+    };
+  } else if (uvIndex < 8) {
+    return { 
+      level: 'High', 
+      color: '#f97316' 
+    };
+  } else if (uvIndex < 11) {
+    return { 
+      level: 'Very High', 
+      color: '#ef4444' 
+    };
+  } else {
+    return { 
+      level: 'Extreme', 
+      color: '#8b5cf6' 
+    };
   }
 };
