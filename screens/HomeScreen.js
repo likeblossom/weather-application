@@ -328,13 +328,13 @@ export default function HomeScreen({ navigation }) {
               {/* Temperature section */}
               <View style={styles.temperatureContainer}>
                   <Text style={styles.temperature}>
-                      {current?.temperature_2m ? `${Math.round(current.temperature_2m)}` : ''}
-                      {current?.temperature_2m && <Text>&#176;C</Text>}
+                      {current?.temperature_2m !== undefined && current?.temperature_2m !== null ? `${Math.round(current.temperature_2m)}` : ''}
+                      {(current?.temperature_2m !== undefined && current?.temperature_2m !== null) && <Text>&#176;C</Text>}
                   </Text>
                   <Text style={styles.weatherDescription}>
                       {current?.weathercode !== undefined ? getWeatherCondition(current.weathercode).condition : ''}
                   </Text>
-                  {current?.apparent_temperature && (
+                  {(current?.apparent_temperature !== undefined && current?.apparent_temperature !== null) && (
                     <Text style={styles.feelsLike}>
                       Feels like {Math.round(current.apparent_temperature)}&#176;C
                     </Text>
@@ -348,7 +348,7 @@ export default function HomeScreen({ navigation }) {
                       style={styles.statIcon} 
                       />
                   <Text style={styles.statText}> 
-                      {current?.windspeed_10m ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
+                      {current?.windspeed_10m !== undefined && current?.windspeed_10m !== null ? `${Math.round(current.windspeed_10m)} km/h` : '--'}
                       </Text>
                 </View>
                   <View style={styles.statItem}>
@@ -357,7 +357,7 @@ export default function HomeScreen({ navigation }) {
                       style={styles.statIcon} 
                       />
                   <Text style={styles.statText}> 
-                      {current?.relativehumidity_2m ? `${current.relativehumidity_2m}%` : '--'}
+                      {current?.relativehumidity_2m !== undefined && current?.relativehumidity_2m !== null ? `${current.relativehumidity_2m}%` : '--'}
                       </Text>
                 </View>
                   <View style={styles.statItem}>
@@ -435,7 +435,7 @@ export default function HomeScreen({ navigation }) {
                       <Text style={styles.weatherDetailLabel}>UV Index</Text>
                     </View>
                     <Text style={styles.weatherDetailValue}>
-                      {current?.uv_index ? Math.round(current.uv_index) : '--'}
+                      {current?.uv_index !== undefined && current?.uv_index !== null ? Math.round(current.uv_index) : '--'}
                     </Text>
                     <Text style={[styles.weatherDetailSubtext, { color: getUVIndexInfo(current?.uv_index).color }]}>
                       {getUVIndexInfo(current?.uv_index).level}

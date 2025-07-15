@@ -127,13 +127,13 @@ export const getDayName = (dateString, timezoneOffset = 0) => {
 
 // Helper function to format visibility
 export const formatVisibility = (visibility) => {
-  if (!visibility) return '--';
+  if (visibility === null || visibility === undefined) return '--';
   return `${Math.round(visibility / 1000)} km`;
 };
 
 // Helper function to get visibility description
 export const getVisibilityDescription = (visibility) => {
-  if (!visibility) return 'No data';
+  if (visibility === null || visibility === undefined) return 'No data';
   
   const visibilityKm = visibility / 1000;
   
@@ -154,13 +154,13 @@ export const getVisibilityDescription = (visibility) => {
 
 // Helper function to format pressure
 export const formatPressure = (pressure) => {
-  if (!pressure) return '--';
+  if (pressure === null || pressure === undefined) return '--';
   return `${Math.round(pressure)} hPa`;
 };
 
 // Helper function to get UV index level and recommendation
 export const getUVIndexInfo = (uvIndex) => {
-  if (!uvIndex || uvIndex < 0) return { level: '--', recommendation: 'No data available', color: '#9ca3af' };
+  if (uvIndex === null || uvIndex === undefined || uvIndex < 0) return { level: '--', recommendation: 'No data available', color: '#9ca3af' };
   
   if (uvIndex < 3) {
     return { 
