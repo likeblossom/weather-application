@@ -2,20 +2,21 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Image, TextInput, TouchableOpacity, View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon } from 'react-native-heroicons/outline';
+import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon, SunIcon, EyeIcon } from 'react-native-heroicons/outline';
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription, formatPM25, getPM25Description, getPM25Color, formatDust, getDustDescription } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
 
   const [showSearch, toggleSearch] = React.useState(false);
   const [locations, setLocations] = React.useState([]);
   const [weather, setWeather] = React.useState({});
+  const [fullHourlyData, setFullHourlyData] = React.useState(null);
   const [currentLocation, setCurrentLocation] = React.useState(null);
   const [loadingLocation, setLoadingLocation] = React.useState(false);
   const searchInputRef = useRef(null);
@@ -51,30 +52,56 @@ export default function HomeScreen() {
       latitude: location.latitude,
       longitude: location.longitude
     }).then(data => {
-      // Process hourly data to show only next 12 hours from current time in city's timezone
+      console.log('API Response structure:', {
+        hasData: !!data,
+        hasCurrent: !!data?.current,
+        hasHourly: !!data?.hourly,
+        hasDaily: !!data?.daily
+      });
+      
+      if (!data) {
+        console.error('No data received from weather API');
+        return;
+      }
+      
+      if (!data.current) {
+        console.error('No current weather data received');
+        return;
+      }
+      
+      if (!data.hourly || !data.hourly.time) {
+        console.error('No hourly weather data received');
+        return;
+      }
+      
+      // Store the full hourly data for the detailed view (24 hours)
       if (data?.hourly?.time && data?.current?.time) {
-        // Use the current time from the API response (city's timezone)
         const currentTimeInCity = new Date(data.current.time);
-        const currentHour = currentTimeInCity.getHours();
-        const currentDate = currentTimeInCity.getDate();
-        
-        // Find the index of the current hour in the hourly data
         let startIndex = 0;
+        
         for (let i = 0; i < data.hourly.time.length; i++) {
           const hourlyTime = new Date(data.hourly.time[i]);
-          // Check if this hour matches the current hour and date in the city's timezone
-          if (hourlyTime.getHours() === currentHour && hourlyTime.getDate() === currentDate) {
-            startIndex = i;
-            break;
-          }
-          // If passed the current time, use the next available hour
           if (hourlyTime >= currentTimeInCity) {
             startIndex = i;
             break;
           }
         }
         
-        // Slice the arrays to get next 13 hours
+        // Store full 24 hours for detailed view
+        const full24Hours = {
+          ...data.hourly,
+          time: data.hourly.time.slice(startIndex, startIndex + 24),
+          temperature_2m: data.hourly.temperature_2m?.slice(startIndex, startIndex + 24),
+          apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 24),
+          weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 24),
+          relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 24),
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 24),
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 24)
+        };
+        
+        setFullHourlyData(full24Hours);
+        
+        // Process hourly data to show only next 13 hours from current time in city's timezone for home screen
         const next13Hours = {
           ...data.hourly,
           time: data.hourly.time.slice(startIndex, startIndex + 13),
@@ -82,7 +109,8 @@ export default function HomeScreen() {
           apparent_temperature: data.hourly.apparent_temperature?.slice(startIndex, startIndex + 13),
           weathercode: data.hourly.weathercode?.slice(startIndex, startIndex + 13),
           relativehumidity_2m: data.hourly.relativehumidity_2m?.slice(startIndex, startIndex + 13),
-          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13)
+          windspeed_10m: data.hourly.windspeed_10m?.slice(startIndex, startIndex + 13),
+          precipitation_probability: data.hourly.precipitation_probability?.slice(startIndex, startIndex + 13)
         };
         
         data.hourly = next13Hours;
@@ -96,6 +124,9 @@ export default function HomeScreen() {
       console.log('Hourly time array:', data?.hourly?.time);
       console.log('Weather code:', data?.current?.weathercode);
       console.log('Weather condition:', data?.current?.weathercode ? getWeatherCondition(data.current.weathercode) : 'No weather code');
+    }).catch(error => {
+      console.error('Error fetching weather data:', error);
+      Alert.alert('Error', 'Failed to fetch weather data. Please try again.');
     });
   }
 
@@ -103,11 +134,13 @@ export default function HomeScreen() {
     const newSearchState = !showSearch;
     toggleSearch(newSearchState);
     
-    // If opening search, focus the input after a small delay
-    if (newSearchState && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current.focus();
-      }, 100);
+    // If opening search, focus the input immediately
+    if (newSearchState) {
+      requestAnimationFrame(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      });
     }
   };
 
@@ -185,7 +218,7 @@ export default function HomeScreen() {
   }
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 700), []);
-  const {current, daily, hourly} = weather;
+  const {current, daily, hourly, airQuality} = weather;
 
   return (
     <View style={styles.container}>
@@ -391,11 +424,114 @@ export default function HomeScreen() {
                 </View>
               </View>
 
+              {/* Weather Details Card */}
+              <View style={styles.weatherDetailsCard}>
+                <Text style={styles.weatherDetailsTitle}>Today's Details</Text>
+                <View style={styles.weatherDetailsGrid}>
+                  {/* UV Index */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <SunIcon size="20" color="#f59e0b" />
+                      <Text style={styles.weatherDetailLabel}>UV Index</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {current?.uv_index ? Math.round(current.uv_index) : '--'}
+                    </Text>
+                    <Text style={[styles.weatherDetailSubtext, { color: getUVIndexInfo(current?.uv_index).color }]}>
+                      {getUVIndexInfo(current?.uv_index).level}
+                    </Text>
+                  </View>
+
+                  {/* Visibility */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <EyeIcon size="20" color="white" />
+                      <Text style={styles.weatherDetailLabel}>Visibility</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatVisibility(current?.visibility)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>{getVisibilityDescription(current?.visibility)}</Text>
+                  </View>
+
+                  {/* Pressure */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/wind.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: 'white' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Pressure</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatPressure(current?.pressure_msl)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>Sea level</Text>
+                  </View>
+
+                  {/* Precipitation */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/heavyrain.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Probability</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {hourly?.precipitation_probability?.[0] !== undefined ? `${hourly.precipitation_probability[0]}%` : '--'}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>Currently</Text>
+                  </View>
+
+                  {/* Air Quality (PM2.5) */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/wind.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: '#60a5fa' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Air Quality</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatPM25(airQuality?.pm2_5)}
+                    </Text>
+                    <Text style={[styles.weatherDetailSubtext, { color: getPM25Color(airQuality?.pm2_5), textAlign: 'center' }]}>
+                      {getPM25Description(airQuality?.pm2_5)}
+                    </Text>
+                  </View>
+
+                  {/* Dust */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/mist.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: '#d97706' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Dust</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatDust(airQuality?.dust)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>{getDustDescription(airQuality?.dust)}</Text>
+                  </View>
+                </View>
+              </View>
+
               {/* Hourly Forecast section */}
               <View style={styles.hourlyForecastInline}>
                   <View style={styles.forecastHeader}>
                       <CalendarDaysIcon size="22" color="white" />
                       <Text style={styles.forecastHeaderText}> Hourly forecast</Text>
+                      <TouchableOpacity 
+                        style={styles.seeMoreButton}
+                        onPress={() => navigation.navigate('HourlyForecast', {
+                          hourlyData: fullHourlyData,
+                          locationName: currentLocation?.name ? `${currentLocation.name}${currentLocation.country ? `, ${currentLocation.country}` : ''}` : 'Unknown Location'
+                        })}
+                      >
+                        <Text style={styles.seeMoreText}>See more</Text>
+                      </TouchableOpacity>
                   </View>
                   <ScrollView
                       horizontal
@@ -645,6 +781,7 @@ const styles = StyleSheet.create({
   forecastHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginHorizontal: 20,
     marginBottom: 12,
   },
@@ -652,6 +789,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     marginLeft: 8,
+    flex: 1,
+  },
+  seeMoreButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    marginLeft: 4,
+  },
+  seeMoreText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '500',
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -661,7 +811,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 110,
     borderRadius: 24,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 8,
     marginRight: 16,
   },
@@ -700,12 +850,62 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   hourlyForecastInline: {
-    marginTop: 15,
-    marginBottom: 20,
+    marginTop: 30,
+    marginBottom: 8,
   },
   // Daily Forecast section styles
   dailyForecastContainer: {
-    marginBottom: 30,
     marginHorizontal: 16,
+  },
+  // Weather Details Card styles
+  weatherDetailsCard: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    padding: 20,
+  },
+  weatherDetailsTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  weatherDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  weatherDetailItem: {
+    width: '48%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  weatherDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  weatherDetailLabel: {
+    color: '#ffffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  weatherDetailValue: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  weatherDetailSubtext: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
