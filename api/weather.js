@@ -3,6 +3,9 @@ import axios from 'axios';
 const forecastEndpoint = params => 
   `https://api.open-meteo.com/v1/forecast?latitude=${params.latitude}&longitude=${params.longitude}&current=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index,visibility,pressure_msl&hourly=temperature_2m,apparent_temperature,relativehumidity_2m,weathercode,windspeed_10m,precipitation_probability,uv_index&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
 
+const airQualityEndpoint = params => 
+  `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${params.latitude}&longitude=${params.longitude}&current=pm2_5,dust&timezone=auto`;
+
 const locationsEndpoint = params => 
   `https://geocoding-api.open-meteo.com/v1/search?name=${params.cityName}&count=10&language=en&format=json`;
 
@@ -21,9 +24,30 @@ const apiCall = async (endpoint) => {
   }
 };
 
-export const fetchWeatherForecast = (params) => {
-  let forecastUrl = forecastEndpoint(params);
-  return apiCall(forecastUrl);
+export const fetchWeatherForecast = async (params) => {
+  try {
+    // Fetch both weather and air quality data
+    const [weatherData, airQualityData] = await Promise.all([
+      apiCall(forecastEndpoint(params)),
+      apiCall(airQualityEndpoint(params))
+    ]);
+    
+    // Combine the data
+    if (weatherData && airQualityData) {
+      return {
+        ...weatherData,
+        airQuality: airQualityData.current
+      };
+    }
+    
+    // Return weather data even if air quality fails
+    return weatherData;
+  } catch (error) {
+    console.log('Error fetching weather/air quality data: ', error);
+    // Fallback to just weather data
+    const weatherUrl = forecastEndpoint(params);
+    return apiCall(weatherUrl);
+  }
 };
 
 export const fetchLocations = (params) => {
@@ -163,5 +187,70 @@ export const getUVIndexInfo = (uvIndex) => {
       level: 'Extreme', 
       color: '#8b5cf6' 
     };
+  }
+};
+
+// Helper function to format PM2.5 air quality
+export const formatPM25 = (pm25) => {
+  if (!pm25 && pm25 !== 0) return '--';
+  return `${Math.round(pm25)} µg/m³`;
+};
+
+// Helper function to get PM2.5 air quality description
+export const getPM25Description = (pm25) => {
+  if (!pm25 && pm25 !== 0) return 'No data';
+  
+  if (pm25 <= 12) {
+    return 'Good';
+  } else if (pm25 <= 35) {
+    return 'Moderate';
+  } else if (pm25 <= 55) {
+    return 'Unhealthy for sensitive groups';
+  } else if (pm25 <= 150) {
+    return 'Unhealthy';
+  } else if (pm25 <= 250) {
+    return 'Very unhealthy';
+  } else {
+    return 'Hazardous';
+  }
+};
+
+// Helper function to get PM2.5 air quality color
+export const getPM25Color = (pm25) => {
+  if (!pm25 && pm25 !== 0) return '#9ca3af';
+  
+  if (pm25 <= 12) {
+    return '#22c55e'; // Good - Green
+  } else if (pm25 <= 35) {
+    return '#eab308'; // Moderate - Yellow
+  } else if (pm25 <= 55) {
+    return '#f97316'; // Unhealthy for sensitive - Orange
+  } else if (pm25 <= 150) {
+    return '#ef4444'; // Unhealthy - Red
+  } else if (pm25 <= 250) {
+    return '#8b5cf6'; // Very unhealthy - Purple
+  } else {
+    return '#7c2d12'; // Hazardous - Maroon
+  }
+};
+
+// Helper function to format dust concentration
+export const formatDust = (dust) => {
+  if (!dust && dust !== 0) return '--';
+  return `${Math.round(dust)} µg/m³`;
+};
+
+// Helper function to get dust description
+export const getDustDescription = (dust) => {
+  if (!dust && dust !== 0) return 'No data';
+  
+  if (dust <= 50) {
+    return 'Low';
+  } else if (dust <= 100) {
+    return 'Moderate';
+  } else if (dust <= 200) {
+    return 'High';
+  } else {
+    return 'Very high';
   }
 };

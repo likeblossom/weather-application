@@ -6,7 +6,7 @@ import { CalendarDaysIcon, MagnifyingGlassIcon, MapPinIcon as MapPinOutlineIcon,
 import { MapPinIcon } from 'react-native-heroicons/solid';
 import { theme } from '../theme';
 import {debounce} from 'lodash';
-import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription } from '../api/weather';
+import { fetchLocations, fetchWeatherForecast, getWeatherCondition, getDayName, formatTemperature, formatTime, formatVisibility, formatPressure, getUVIndexInfo, getVisibilityDescription, formatPM25, getPM25Description, getPM25Color, formatDust, getDustDescription } from '../api/weather';
 import { getWeatherImage } from '../constants';
 import { saveLastCity, loadLastCity } from '../storage/asyncStorage';
 import * as Location from 'expo-location';
@@ -218,7 +218,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 700), []);
-  const {current, daily, hourly} = weather;
+  const {current, daily, hourly, airQuality} = weather;
 
   return (
     <View style={styles.container}>
@@ -482,6 +482,38 @@ export default function HomeScreen({ navigation }) {
                       {hourly?.precipitation_probability?.[0] !== undefined ? `${hourly.precipitation_probability[0]}%` : '--'}
                     </Text>
                     <Text style={styles.weatherDetailSubtext}>Currently</Text>
+                  </View>
+
+                  {/* Air Quality (PM2.5) */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/wind.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: '#60a5fa' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Air Quality</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatPM25(airQuality?.pm2_5)}
+                    </Text>
+                    <Text style={[styles.weatherDetailSubtext, { color: getPM25Color(airQuality?.pm2_5), textAlign: 'center' }]}>
+                      {getPM25Description(airQuality?.pm2_5)}
+                    </Text>
+                  </View>
+
+                  {/* Dust */}
+                  <View style={styles.weatherDetailItem}>
+                    <View style={styles.weatherDetailHeader}>
+                      <Image
+                        source={require('../assets/images/mist.png')}
+                        style={[styles.statIcon, { width: 20, height: 20, tintColor: '#d97706' }]} 
+                      />
+                      <Text style={styles.weatherDetailLabel}>Dust</Text>
+                    </View>
+                    <Text style={styles.weatherDetailValue}>
+                      {formatDust(airQuality?.dust)}
+                    </Text>
+                    <Text style={styles.weatherDetailSubtext}>{getDustDescription(airQuality?.dust)}</Text>
                   </View>
                 </View>
               </View>
