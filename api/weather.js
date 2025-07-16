@@ -9,11 +9,15 @@ const airQualityEndpoint = params =>
 const locationsEndpoint = params => 
   `https://geocoding-api.open-meteo.com/v1/search?name=${params.cityName}&count=10&language=en&format=json`;
 
-const apiCall = async (endpoint) => {
+const apiCall = async (endpoint, abortSignal = null) => {
   const options = {
     method: 'GET',
     url: endpoint,
   };
+
+  if (abortSignal) {
+    options.signal = abortSignal;
+  }
 
   try {
     const response = await axios.request(options);
@@ -50,9 +54,9 @@ export const fetchWeatherForecast = async (params) => {
   }
 };
 
-export const fetchLocations = (params) => {
+export const fetchLocations = (params, abortSignal = null) => {
   let locationsUrl = locationsEndpoint(params);
-  return apiCall(locationsUrl);
+  return apiCall(locationsUrl, abortSignal);
 };
 
 // Helper function to get weather condition from weather code

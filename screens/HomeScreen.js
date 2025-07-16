@@ -20,10 +20,17 @@ export default function HomeScreen({ navigation }) {
   const [currentLocation, setCurrentLocation] = React.useState(null);
   const [loadingLocation, setLoadingLocation] = React.useState(false);
   const searchInputRef = useRef(null);
+  const searchAbortController = useRef(null);
 
   // Load last searched city
   useEffect(() => {
     loadLastSearchedCity();
+    
+    return () => {
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+      }
+    };
   }, []);
 
   const loadLastSearchedCity = async () => {
@@ -136,6 +143,14 @@ export default function HomeScreen({ navigation }) {
     const newSearchState = !showSearch;
     toggleSearch(newSearchState);
     
+    // If closing search, clear results and cancel pending requests
+    if (!newSearchState) {
+      setLocations([]);
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+      }
+    }
+    
     // If opening search, focus the input immediately
     if (newSearchState) {
       requestAnimationFrame(() => {
@@ -178,6 +193,7 @@ export default function HomeScreen({ navigation }) {
         const place = reverseGeocode[0];
         const locationData = {
           name: place.city || place.subregion || place.region || 'Current Location',
+          admin1: place.region || '',
           country: place.country || '',
           latitude,
           longitude,
@@ -189,6 +205,7 @@ export default function HomeScreen({ navigation }) {
         // If reverse geocoding fails, still use coordinates
         const locationData = {
           name: 'Current Location',
+          admin1: '',
           country: '',
           latitude,
           longitude,
@@ -208,14 +225,38 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleSearch = value => {
+    // Cancel previous search request if it exists
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+    }
+
     // Fetch locations
     if(value.length > 2){
-      fetchLocations({ cityName: value }).then(data=> {
+      // Create new abort controller for this request
+      searchAbortController.current = new AbortController();
+      
+      fetchLocations({ cityName: value }, searchAbortController.current.signal).then(data=> {
         console.log('got locations: ', data);
         if(data && data.results) {
-          setLocations(data.results);
+          // Filter out duplicates based on name, admin1, and country combination
+          const uniqueLocations = data.results.filter((location, index, self) => {
+            return index === self.findIndex(loc => 
+              loc.name === location.name && 
+              loc.admin1 === location.admin1 && 
+              loc.country === location.country
+            );
+          });
+          setLocations(uniqueLocations);
         }
-      })
+      }).catch(error => {
+        // Only log error if it's not due to request cancellation
+        if (error.name !== 'AbortError') {
+          console.log('Search error:', error);
+        }
+      });
+    } else {
+      // Clear locations when search term is too short
+      setLocations([]);
     }
   }
 
@@ -290,7 +331,11 @@ export default function HomeScreen({ navigation }) {
                                     ]}
                                 >
                                     <MapPinIcon size="20" color="gray" />
-                                    <Text style={styles.locationText}>{loc?.name}, {loc?.country}</Text>
+                                    <Text style={styles.locationText}>
+                                      {loc?.name}
+                                      {loc?.admin1 && `, ${loc.admin1}`}
+                                      {loc?.country && `, ${loc.country}`}
+                                    </Text>
                                 </TouchableOpacity>
                             );
                         })
